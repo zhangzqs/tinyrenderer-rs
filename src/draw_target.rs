@@ -188,10 +188,18 @@ pub trait DrawTarget {
     ) {
         // 确定三角形的最小包围盒
         let (w, h) = self.get_size();
-        let xs = t.into_iter().map(|x| x.x()).chain([w]).collect::<Vec<_>>();
-        let ys = t.into_iter().map(|x| x.y()).chain([h]).collect::<Vec<_>>();
-        let (x_min, x_max) = (*xs.iter().min().unwrap(), *xs.iter().max().unwrap());
-        let (y_min, y_max) = (*ys.iter().min().unwrap(), *ys.iter().max().unwrap());
+        // println!("size: {w} {h}");
+        let xs = t.into_iter().map(|x| x.x()).collect::<Vec<_>>();
+        let ys = t.into_iter().map(|x| x.y()).collect::<Vec<_>>();
+        let (x_min, x_max) = (
+            (*xs.iter().min().unwrap()).max(0),
+            (*xs.iter().max().unwrap()).min(w),
+        );
+        let (y_min, y_max) = (
+            (*ys.iter().min().unwrap()).max(0),
+            (*ys.iter().max().unwrap()).min(h),
+        );
+        // println!("{x_min} {x_max} {y_min} {y_max}");
         for x in x_min..=x_max {
             for y in y_min..=y_max {
                 let p = Vector3::new([x, y, 0]);
@@ -201,6 +209,8 @@ pub trait DrawTarget {
                 }
                 let z =
                     t[0].z() as f32 * bc.x() + t[1].z() as f32 * bc.y() + t[2].z() as f32 * bc.z();
+
+                // println!("{} {}", *zbuffer.get(x, y), z);
                 if *zbuffer.get(x, y) < z {
                     zbuffer.set(x, y, z);
                     self.draw(x, y, color);
@@ -216,7 +226,7 @@ pub struct FrameBuffer<D> {
     data: Vec<D>,
 }
 
-impl<D: Default + Clone> FrameBuffer<D> {
+impl<D: Default + Clone + Copy> FrameBuffer<D> {
     pub fn new(width: i32, height: i32) -> Self {
         Self {
             width,
@@ -231,11 +241,18 @@ impl<D: Default + Clone> FrameBuffer<D> {
         }
     }
 
+    pub fn fill(&mut self, data: D) {
+        for i in 0..self.data.len() {
+            self.data[i] = data;
+        }
+    }
+
     pub fn set(&mut self, x: i32, y: i32, data: D) {
         self.data[(self.width * y + x) as usize] = data;
     }
 
     pub fn get(&self, x: i32, y: i32) -> &D {
+        // println!("get {x} {y}");
         &self.data[(self.width * y + x) as usize]
     }
 
