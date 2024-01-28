@@ -1,24 +1,26 @@
 use std::ops;
 
-use num_traits::{Num, Float};
+use num_traits::{Float, Num};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector<T: Num, const S: usize> {
     data: [T; S],
 }
 
-impl <T: Num+Copy, const S: usize> Vector<T, S> {
+impl<T: Num + Copy, const S: usize> Vector<T, S> {
     pub fn new(data: [T; S]) -> Self {
         Self { data }
     }
 
     pub fn new_zero() -> Self {
-        Self { data: [T::zero(); S] }
+        Self {
+            data: [T::zero(); S],
+        }
     }
 }
 
 /// + operator
-impl <T: Num+Copy, const S: usize> ops::Add for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Add for Vector<T, S> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -31,7 +33,7 @@ impl <T: Num+Copy, const S: usize> ops::Add for Vector<T, S> {
 }
 
 /// - operator
-impl <T: Num+Copy, const S: usize> ops::Sub for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Sub for Vector<T, S> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -44,7 +46,7 @@ impl <T: Num+Copy, const S: usize> ops::Sub for Vector<T, S> {
 }
 
 /// Dot product
-impl <T: Num+Copy, const S: usize> ops::Mul<Vector<T, S>> for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Mul<Vector<T, S>> for Vector<T, S> {
     type Output = T;
 
     fn mul(self, rhs: Vector<T, S>) -> Self::Output {
@@ -52,12 +54,12 @@ impl <T: Num+Copy, const S: usize> ops::Mul<Vector<T, S>> for Vector<T, S> {
         for i in 0..S {
             result = result + self.data[i] * rhs.data[i];
         }
-        result 
+        result
     }
 }
 
 /// Scalar product
-impl <T: Num+Copy, const S: usize> ops::Mul<T> for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Mul<T> for Vector<T, S> {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
@@ -69,7 +71,7 @@ impl <T: Num+Copy, const S: usize> ops::Mul<T> for Vector<T, S> {
     }
 }
 
-impl <T: Num+Copy, const S: usize> ops::Div<T> for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Div<T> for Vector<T, S> {
     type Output = Self;
 
     fn div(self, rhs: T) -> Self::Output {
@@ -81,18 +83,7 @@ impl <T: Num+Copy, const S: usize> ops::Div<T> for Vector<T, S> {
     }
 }
 
-impl <T: Num+Copy, const S: usize> Vector<T, S> {
-    /// Norm square of the vector
-    pub fn norm2(&self) -> T {
-        let mut result = T::zero();
-        for i in 0..S {
-            result = result + self.data[i] * self.data[i];
-        }
-        result
-    }
-}
-
-impl <T: Float, const S: usize> Vector<T, S> {
+impl<T: Float, const S: usize> Vector<T, S> {
     /// Norm of the vector
     pub fn norm(&self) -> T {
         self.norm2().sqrt()
@@ -103,9 +94,23 @@ impl <T: Float, const S: usize> Vector<T, S> {
         let norm = self.norm();
         self.clone() / norm
     }
+
+    /// Norm square of the vector
+    pub fn norm2(&self) -> T {
+        self.dot(*self)
+    }
+
+    /// dot
+    pub fn dot(&self, other: Self) -> T {
+        let mut result = T::zero();
+        for i in 0..S {
+            result = result + self.data[i] * other[i];
+        }
+        result
+    }
 }
 
-impl <T: Num+Copy, const S: usize> ops::Index<usize> for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::Index<usize> for Vector<T, S> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -113,13 +118,13 @@ impl <T: Num+Copy, const S: usize> ops::Index<usize> for Vector<T, S> {
     }
 }
 
-impl <T: Num+Copy, const S: usize> ops::IndexMut<usize> for Vector<T, S> {
+impl<T: Num + Copy, const S: usize> ops::IndexMut<usize> for Vector<T, S> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.data[index]
     }
 }
 
-impl <T: Num+Copy> Vector<T, 2> {
+impl<T: Num + Copy> Vector<T, 2> {
     pub fn x(&self) -> T {
         self.data[0]
     }
@@ -129,7 +134,7 @@ impl <T: Num+Copy> Vector<T, 2> {
     }
 }
 
-impl <T: Num+Copy> Vector<T, 3> {
+impl<T: Num + Copy> Vector<T, 3> {
     pub fn x(&self) -> T {
         self.data[0]
     }
@@ -141,9 +146,17 @@ impl <T: Num+Copy> Vector<T, 3> {
     pub fn z(&self) -> T {
         self.data[2]
     }
+
+    pub fn cross(&self, other: Self) -> Self {
+        Self::new([
+            self.y() * other.z() - self.z() * other.y(),
+            self.z() * other.x() - self.x() * other.z(),
+            self.x() * other.y() - self.y() * other.x(),
+        ])
+    }
 }
 
-impl <T: Num+Copy> Vector<T, 4> {
+impl<T: Num + Copy> Vector<T, 4> {
     pub fn x(&self) -> T {
         self.data[0]
     }
@@ -223,6 +236,13 @@ mod tests {
     fn test_normalize() {
         let v1 = Vector3::new([1.0, 2.0, 3.0]);
         let v2 = v1.normalize();
-        assert_eq!(v2.data, [1.0/14.0f64.sqrt(), 2.0/14.0f64.sqrt(), 3.0/14.0f64.sqrt()]);
+        assert_eq!(
+            v2.data,
+            [
+                1.0 / 14.0f64.sqrt(),
+                2.0 / 14.0f64.sqrt(),
+                3.0 / 14.0f64.sqrt()
+            ]
+        );
     }
 }

@@ -1,25 +1,56 @@
 use embedded_graphics::{
+    image::Image,
     pixelcolor::Rgb888,
-    prelude::{Dimensions, DrawTarget, Size}, image::Image,
+    prelude::{Dimensions, DrawTarget, Size},
 };
 use embedded_graphics_simulator::{OutputSettingsBuilder, SimulatorDisplay, Window};
 
-use crate::draw_target::FrameBuffer;
+use crate::draw_target::{Color, FrameBuffer};
 
-pub fn show_frame_buffer(fb: FrameBuffer) {
-    let mut display =
-        SimulatorDisplay::<Rgb888>::new(Size::new(fb.get_width() as u32, fb.get_height() as u32));
-    let output_settings = OutputSettingsBuilder::new().build();
-    let rect = display.bounding_box();
-    display
-        .fill_contiguous(
-            &rect,
-            fb.get_data()
-                .iter()
-                .map(|c| Rgb888::new(c.r, c.g, c.b))
-                .collect::<Vec<Rgb888>>(),
-        )
-        .map_err(drop)
-        .unwrap();
-    Window::new("Matrix", &output_settings).show_static(&display);
+pub struct DisplayWindow {
+    pub fb: FrameBuffer<Color>,
+    display: SimulatorDisplay<Rgb888>,
+    window: Window,
+}
+
+pub enum Event {
+    Nothing,
+    Exit,
+}
+
+impl DisplayWindow {
+    pub fn new(width: i32, height: i32) -> Self {
+        let display = SimulatorDisplay::<Rgb888>::new(Size::new(width as u32, height as u32));
+        let output_settings = OutputSettingsBuilder::new().build();
+        let window = Window::new("Matrix", &output_settings);
+        Self {
+            fb: FrameBuffer::new(width, height),
+            display,
+            window,
+        }
+    }
+
+    pub fn update(&mut self) -> Event {
+        let rect = self.display.bounding_box();
+        self.display
+            .fill_contiguous(
+                &rect,
+                self.fb
+                    .get_data()
+                    .iter()
+                    .map(|c| Rgb888::new(c.r, c.g, c.b))
+                    .collect::<Vec<Rgb888>>(),
+            )
+            .map_err(drop)
+            .unwrap();
+        self.window.update(&self.display);
+
+        for e in self.window.events() {
+            match e {
+                embedded_graphics_simulator::SimulatorEvent::Quit => return Event::Exit,
+                _ => {}
+            }
+        }
+        Event::Nothing
+    }
 }
