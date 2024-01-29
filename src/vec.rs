@@ -92,7 +92,7 @@ impl<T: Float, const S: usize> Vector<T, S> {
     /// Normalize the vector
     pub fn normalize(&self) -> Self {
         let norm = self.norm();
-        self.clone() / norm
+        *self / norm
     }
 
     /// Norm square of the vector

@@ -1,10 +1,10 @@
-use std::{f32::consts::PI, ops::Sub, thread, time::Instant};
+use std::{f32::consts::PI, ops::Sub, time::Instant};
 
-use draw_target::{Color, DrawTarget, FrameBuffer, GREEN, RED, WHITE};
+use draw_target::{DrawTarget, FrameBuffer};
 
-use model::Model;
+use model::{Model, Texture};
 use util::DisplayWindow;
-use vec::{Vector2, Vector3};
+use vec::Vector3;
 
 mod draw_target;
 mod mat;
@@ -14,6 +14,7 @@ mod vec;
 
 fn main() {
     let obj = Model::load_from_obj("assets/african_head.obj");
+    let texture = Texture::load_from_tga("assets/african_head_diffuse.tga");
     let (w, h) = (800, 800);
     let mut window = DisplayWindow::new(w, h);
 
@@ -23,7 +24,7 @@ fn main() {
         fps += 1.0;
         if fps > 120.0 {
             let now = Instant::now();
-            fps = fps as f32 / now.sub(last_time).as_secs_f32();
+            fps /= now.sub(last_time).as_secs_f32();
             println!("fps: {fps}");
             fps = 0.0f32;
             last_time = now;
@@ -35,10 +36,11 @@ fn main() {
         zbuffer.fill(-f32::MAX);
         for i in 0..obj.faces_count() {
             let face = obj.get_face(i);
+            // 分别对三个顶点做变换
             let t = (0..3)
                 .map(|j| {
                     // 世界坐标
-                    let wc = obj.get_vertex(face[j]);
+                    let wc = obj.get_vertex(face[j].0);
 
                     // 模型变换
                     let wc = Vector3::new([
@@ -46,13 +48,19 @@ fn main() {
                         wc.y(),
                         wc.z() * r.cos() - wc.x() * r.sin(),
                     ]);
-                    let wc = wc + Vector3::new([0.0, -1.0, 0.0]);
+                    let wc = wc + Vector3::new([0.0, 0.0, 0.0]);
                     // 投影变换（平行投影）
                     let sc = Vector3::new([wc.x(), wc.y(), wc.z()]);
                     // 视口变换
                     let x0 = ((sc.x() + 1.0) / 2.0 * w as f32) as i32;
                     let y0 = ((sc.y() + 1.0) / 2.0 * h as f32) as i32;
-                    (wc, Vector3::new([x0, y0, (sc.z() * 1000.0) as i32]))
+
+                    // 世界坐标，屏幕坐标，uv坐标
+                    (
+                        wc,
+                        Vector3::new([x0, y0, (sc.z() * 1000.0) as i32]),
+                        obj.get_uv(face[j].1),
+                    )
                 })
                 .collect::<Vec<_>>();
             // 计算三角形平面法向量
@@ -64,15 +72,14 @@ fn main() {
                 window.fb.draw_trangle_with_zbuffer(
                     [t[0].1, t[1].1, t[2].1],
                     &mut zbuffer,
-                    Color {
-                        r: (intensity * 255.0) as u8,
-                        g: (intensity * 255.0) as u8,
-                        b: (intensity * 255.0) as u8,
-                    },
+                    [
+                        texture.get_color(t[0].2[0], t[0].2[1]).scale(intensity),
+                        texture.get_color(t[1].2[0], t[1].2[1]).scale(intensity),
+                        texture.get_color(t[2].2[0], t[2].2[1]).scale(intensity),
+                    ],
                 );
             }
         }
-        // println!("update");
         let e = window.update();
         match e {
             util::Event::Nothing => {}

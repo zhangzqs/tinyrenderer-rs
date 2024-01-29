@@ -1,5 +1,4 @@
 use embedded_graphics::{
-    image::Image,
     pixelcolor::Rgb888,
     prelude::{Dimensions, DrawTarget, Size},
 };

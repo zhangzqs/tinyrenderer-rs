@@ -1,4 +1,4 @@
-use crate::vec::{Vector, Vector2, Vector3};
+use crate::vec::{Vector2, Vector3};
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Color {
@@ -10,6 +10,14 @@ pub struct Color {
 impl Color {
     const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
+    }
+
+    pub fn scale(self, fx: f32) -> Self {
+        Self {
+            r: (fx * self.r as f32) as u8,
+            g: (fx * self.g as f32) as u8,
+            b: (fx * self.b as f32) as u8,
+        }
     }
 }
 
@@ -49,15 +57,15 @@ pub trait DrawTarget {
                 (start, end)
             };
 
-            let x0 = start.x() as i32;
-            let y0 = start.y() as i32;
-            let x1 = end.x() as i32;
-            let y1 = end.y() as i32;
+            let x0 = start.x();
+            let y0 = start.y();
+            let x1 = end.x();
+            let y1 = end.y();
             // 由于是以x为基准遍历，所以需要dx >= dy
             for x in x0..=x1 {
                 let t = (x - x0) as f32 / (x1 - x0) as f32;
                 let y = (y0 as f32 * (1.0 - t) + y1 as f32 * t) as i32;
-                self.draw(x as i32, y as i32, color);
+                self.draw(x, y, color);
             }
         } else {
             // 排序，使得start.y() <= end.y()
@@ -67,15 +75,15 @@ pub trait DrawTarget {
                 (start, end)
             };
 
-            let x0 = start.x() as i32;
-            let y0 = start.y() as i32;
-            let x1 = end.x() as i32;
-            let y1 = end.y() as i32;
+            let x0 = start.x();
+            let y0 = start.y();
+            let x1 = end.x();
+            let y1 = end.y();
             // 反之需要是以y为基准遍历
             for y in y0..=y1 {
                 let t = (y - y0) as f32 / (y1 - y0) as f32;
                 let x = (x0 as f32 * (1.0 - t) + x1 as f32 * t) as i32;
-                self.draw(x as i32, y as i32, color);
+                self.draw(x, y, color);
             }
         }
     }
@@ -89,10 +97,10 @@ pub trait DrawTarget {
                 (start, end)
             };
 
-            let x0 = start.x() as i32;
-            let y0 = start.y() as i32;
-            let x1 = end.x() as i32;
-            let y1 = end.y() as i32;
+            let x0 = start.x();
+            let y0 = start.y();
+            let x1 = end.x();
+            let y1 = end.y();
             let dx = x1 - x0;
             let dy = y1 - y0;
             // 绘制一个不陡峭的线段，即斜率小于1的线段，即dx>dy
@@ -106,7 +114,7 @@ pub trait DrawTarget {
                     y += if y1 > y0 { 1 } else { -1 };
                     error2 -= 2 * dx;
                 }
-                self.draw(x as i32, y as i32, color);
+                self.draw(x, y, color);
             }
         } else {
             // 绘制一个陡峭的线段，即斜率大于1的线段，即dx<dy
@@ -117,10 +125,10 @@ pub trait DrawTarget {
                 (start, end)
             };
 
-            let x0 = start.x() as i32;
-            let y0 = start.y() as i32;
-            let x1 = end.x() as i32;
-            let y1 = end.y() as i32;
+            let x0 = start.x();
+            let y0 = start.y();
+            let x1 = end.x();
+            let y1 = end.y();
             let dx = x1 - x0;
             let dy = y1 - y0;
 
@@ -134,7 +142,7 @@ pub trait DrawTarget {
                     x += if x1 > x0 { 1 } else { -1 };
                     error2 -= 2 * dy;
                 }
-                self.draw(x as i32, y as i32, color);
+                self.draw(x, y, color);
             }
         }
     }
@@ -184,7 +192,7 @@ pub trait DrawTarget {
         &mut self,
         t: [Vector3<i32>; 3],
         zbuffer: &mut FrameBuffer<f32>,
-        color: Color,
+        color: [Color; 3],
     ) {
         // 确定三角形的最小包围盒
         let (w, h) = self.get_size();
@@ -193,11 +201,11 @@ pub trait DrawTarget {
         let ys = t.into_iter().map(|x| x.y()).collect::<Vec<_>>();
         let (x_min, x_max) = (
             (*xs.iter().min().unwrap()).max(0),
-            (*xs.iter().max().unwrap()).min(w),
+            (*xs.iter().max().unwrap()).min(w - 1),
         );
         let (y_min, y_max) = (
             (*ys.iter().min().unwrap()).max(0),
-            (*ys.iter().max().unwrap()).min(h),
+            (*ys.iter().max().unwrap()).min(h - 1),
         );
         // println!("{x_min} {x_max} {y_min} {y_max}");
         for x in x_min..=x_max {
@@ -213,7 +221,27 @@ pub trait DrawTarget {
                 // println!("{} {}", *zbuffer.get(x, y), z);
                 if *zbuffer.get(x, y) < z {
                     zbuffer.set(x, y, z);
-                    self.draw(x, y, color);
+
+                    let (mut r, mut g, mut b) = (0.0f32, 0.0f32, 0.0f32);
+                    r += bc.x() * color[0].r as f32
+                        + bc.y() * color[1].r as f32
+                        + bc.z() * color[2].r as f32;
+                    g += bc.x() * color[0].g as f32
+                        + bc.y() * color[1].g as f32
+                        + bc.z() * color[2].g as f32;
+                    b += bc.x() * color[0].b as f32
+                        + bc.y() * color[1].b as f32
+                        + bc.z() * color[2].b as f32;
+
+                    self.draw(
+                        x,
+                        y,
+                        Color {
+                            r: r as u8,
+                            g: g as u8,
+                            b: b as u8,
+                        },
+                    );
                 }
             }
         }
