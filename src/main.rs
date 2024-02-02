@@ -2,13 +2,15 @@ use std::{f32::consts::PI, ops::Sub, time::Instant};
 
 use draw_target::{DrawTarget, FrameBuffer};
 
+use mat::Matrix;
 use model::{Model, Texture};
 use util::DisplayWindow;
-use vec::Vector3;
+use vec::{Vector3, Vector4};
 
 mod draw_target;
 mod mat;
 mod model;
+mod transform;
 mod util;
 mod vec;
 
@@ -17,6 +19,10 @@ fn main() {
     let texture = Texture::load_from_tga("assets/african_head_diffuse.tga");
     let (w, h) = (800, 800);
     let mut window = DisplayWindow::new(w, h);
+
+    let mut eye = Vector3::new([0.0, 0.0, 20.0]);
+    let mut look_at = Vector3::new([0.0, 0.0, -1.0]);
+    let mut up = Vector3::new([0.0, 1.0, 0.0]);
 
     let mut fps = 0.0;
     let mut last_time = Instant::now();
@@ -39,26 +45,31 @@ fn main() {
             // 分别对三个顶点做变换
             let t = (0..3)
                 .map(|j| {
-                    // 世界坐标
-                    let wc = obj.get_vertex(face[j].0);
+                    // 模型坐标系中得到模型坐标
+                    let wc = obj.get_vertex(face[j].0).to_homo_coord();
 
-                    // 模型变换
-                    let wc = Vector3::new([
-                        wc.z() * r.sin() + wc.x() * r.cos(),
-                        wc.y(),
-                        wc.z() * r.cos() - wc.x() * r.sin(),
-                    ]);
-                    let wc = wc + Vector3::new([0.0, 0.0, 0.0]);
-                    // 投影变换（平行投影）
-                    let sc = Vector3::new([wc.x(), wc.y(), wc.z()]);
-                    // 视口变换
-                    let x0 = ((sc.x() + 1.0) / 2.0 * w as f32) as i32;
-                    let y0 = ((sc.y() + 1.0) / 2.0 * h as f32) as i32;
+                    // 模型变换到世界坐标系
+                    let wc = transform::translate(Vector3::new([0.0, 0.0, -3.0]))
+                        * transform::rotate(Vector3::new([0.0, 1.0, 0.0]), r)
+                        * wc;
+
+                    // 相机变换到相机坐标系
+                    let wc = transform::camera(eye, look_at, up) * wc;
+
+                    // 投影变换到规范化坐标系
+                    let wc = transform::persp(-1.0, 1.0, -1.0, 1.0, 100.0, -10.0) * wc;
+
+                    // 齐次坐标系映射到笛卡尔坐标系
+                    let wc = Vector3::from_homo_coord(wc);
+
+                    // 视口变换到屏幕坐标系
+                    let x0 = ((wc.x() + 1.0) / 2.0 * w as f32) as i32;
+                    let y0 = ((wc.y() + 1.0) / 2.0 * h as f32) as i32;
 
                     // 世界坐标，屏幕坐标，uv坐标
                     (
                         wc,
-                        Vector3::new([x0, y0, (sc.z() * 1000.0) as i32]),
+                        Vector3::new([x0, y0, (wc.z() * 1000.0) as i32]),
                         obj.get_uv(face[j].1),
                     )
                 })
@@ -81,9 +92,31 @@ fn main() {
             }
         }
         let e = window.update();
-        match e {
-            util::Event::Nothing => {}
-            util::Event::Exit => return,
+        {
+            use util::Event::*;
+            match e {
+                Nothing => {}
+                Go => {
+                    eye = eye + look_at.normalize() * 0.5;
+                }
+                Back => {
+                    eye = eye - look_at.normalize() * 0.5;
+                }
+                TurnLeft => {
+                    look_at = Vector3::from_homo_coord(
+                        transform::rotate(Vector3::new([0.0, 1.0, 0.0]), 0.01)
+                            * look_at.to_homo_coord(),
+                    );
+                }
+                TurnRight => {
+                    look_at = Vector3::from_homo_coord(
+                        transform::rotate(Vector3::new([0.0, 1.0, 0.0]), -0.01)
+                            * look_at.to_homo_coord(),
+                    );
+                }
+                Exit => return,
+                _ => {}
+            }
         }
     }
 }

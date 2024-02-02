@@ -132,6 +132,14 @@ impl<T: Num + Copy> Vector<T, 2> {
     pub fn y(&self) -> T {
         self.data[1]
     }
+
+    pub fn to_homo_coord(&self) -> Vector<T, 3> {
+        Vector3::new([self.x(), self.y(), T::one()])
+    }
+
+    pub fn from_homo_coord(f: Vector<T, 3>) -> Self {
+        Self::new([f.x(), f.y()]) / f.z()
+    }
 }
 
 impl<T: Num + Copy> Vector<T, 3> {
@@ -153,6 +161,14 @@ impl<T: Num + Copy> Vector<T, 3> {
             self.z() * other.x() - self.x() * other.z(),
             self.x() * other.y() - self.y() * other.x(),
         ])
+    }
+
+    pub fn to_homo_coord(&self) -> Vector<T, 4> {
+        Vector4::new([self.x(), self.y(), self.z(), T::one()])
+    }
+
+    pub fn from_homo_coord(f: Vector<T, 4>) -> Self {
+        Self::new([f.x(), f.y(), f.z()]) / f.w()
     }
 }
 

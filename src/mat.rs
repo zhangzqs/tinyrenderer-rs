@@ -2,19 +2,48 @@ use crate::vec::Vector;
 use num_traits::Num;
 use std::ops;
 
-struct Matrix<T: Num, const R: usize, const C: usize> {
+#[derive(Debug, Clone, Copy)]
+pub struct Matrix<T: Num, const R: usize, const C: usize> {
     data: [Vector<T, C>; R],
 }
 
 impl<T: Num + Copy, const R: usize, const C: usize> Matrix<T, R, C> {
-    fn new(data: [Vector<T, C>; R]) -> Self {
+    pub fn new(data: [Vector<T, C>; R]) -> Self {
         Self { data }
     }
 
-    fn new_zero() -> Self {
+    pub fn new_zero() -> Self {
         Self {
             data: [Vector::new_zero(); R],
         }
+    }
+
+    pub fn get(&self, rowi: usize, coli: usize) -> T {
+        self.data[rowi][coli]
+    }
+
+    pub fn set(&mut self, rowi: usize, coli: usize, val: T) {
+        self.data[rowi][coli] = val
+    }
+
+    pub fn transpose(&self) -> Matrix<T, C, R> {
+        let mut ret = Matrix::<T, C, R>::new_zero();
+        for r in 0..R {
+            for c in 0..C {
+                ret.set(c, r, self.get(r, c));
+            }
+        }
+        ret
+    }
+}
+
+impl<T: Num + Copy, const N: usize> Matrix<T, N, N> {
+    pub fn identity() -> Self {
+        let mut ret = Self::new_zero();
+        for i in 0..N {
+            ret.set(i, i, T::one());
+        }
+        ret
     }
 }
 
@@ -47,6 +76,19 @@ impl<T: Num + Copy, const R: usize, const C: usize> ops::Index<usize> for Matrix
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.data[index]
+    }
+}
+
+/// 矩阵数乘运算
+impl<T: Num + Copy, const R: usize, const C: usize> ops::Mul<T> for Matrix<T, R, C> {
+    type Output = Self;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        let mut data = self.data;
+        for i in 0..R {
+            data[i] = data[i] * rhs;
+        }
+        Matrix::new(data)
     }
 }
 

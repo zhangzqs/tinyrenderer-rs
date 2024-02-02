@@ -2,7 +2,7 @@ use embedded_graphics::{
     pixelcolor::Rgb888,
     prelude::{Dimensions, DrawTarget, Size},
 };
-use embedded_graphics_simulator::{OutputSettingsBuilder, SimulatorDisplay, Window};
+use embedded_graphics_simulator::{sdl2::Keycode, OutputSettingsBuilder, SimulatorDisplay, Window};
 
 use crate::draw_target::{Color, FrameBuffer};
 
@@ -15,6 +15,10 @@ pub struct DisplayWindow {
 pub enum Event {
     Nothing,
     Exit,
+    Go,
+    Back,
+    TurnLeft,
+    TurnRight,
 }
 
 impl DisplayWindow {
@@ -47,6 +51,16 @@ impl DisplayWindow {
         for e in self.window.events() {
             match e {
                 embedded_graphics_simulator::SimulatorEvent::Quit => return Event::Exit,
+                embedded_graphics_simulator::SimulatorEvent::KeyDown { keycode, .. } => {
+                    println!("press key: {:?}", keycode);
+                    match keycode {
+                        Keycode::W => return Event::Go,
+                        Keycode::S => return Event::Back,
+                        Keycode::A => return Event::TurnLeft,
+                        Keycode::D => return Event::TurnRight,
+                        _ => {}
+                    }
+                }
                 _ => {}
             }
         }
