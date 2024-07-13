@@ -1,4 +1,7 @@
-use crate::vec::{Vector2, Vector3};
+use crate::{
+    mat::Matrix,
+    vec::{Vector2, Vector3},
+};
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Color {
@@ -26,19 +29,80 @@ pub const GREEN: Color = Color::new(0, 255, 0);
 pub const WHITE: Color = Color::new(255, 255, 255);
 pub const RED: Color = Color::new(255, 0, 0);
 
-fn barycentric(t: [Vector3<i32>; 3], p: Vector3<i32>) -> Vector3<f32> {
-    let (a, b, c) = (t[0], t[1], t[2]);
-    let (ac, ab, pa) = (c - a, b - a, a - p);
-    let xs = Vector3::new([ab.x(), ac.x(), pa.x()]);
-    let ys = Vector3::new([ab.y(), ac.y(), pa.y()]);
+pub struct Triangle2D {
+    // 三个顶点坐标
+    pub a: Vector2<i32>,
+    pub b: Vector2<i32>,
+    pub c: Vector2<i32>,
 
-    let n = xs.cross(ys);
-    if n.z().abs() > 0 {
-        let u = n.x() as f32 / n.z() as f32;
-        let v = n.y() as f32 / n.z() as f32;
-        Vector3::new([1.0 - u - v, u, v])
-    } else {
-        Vector3::new([-1.0, 1.0, 1.0])
+    // 三个坐标的深度值
+    pub depth: Vector3<f32>,
+
+    // 三个顶点的uv值
+    pub uv_a: Vector2<f32>,
+    pub uv_b: Vector2<f32>,
+    pub uv_c: Vector2<f32>,
+
+    // 三个顶点的光照强度
+    pub intensity: Vector3<f32>,
+}
+
+impl Triangle2D {
+    /// 计算一个三角形的重心坐标
+    /// 重心坐标表示了一个点所对的三条边形成的三角形的面积比
+    pub fn barycentric(&self, p: Vector2<i32>) -> Vector3<f32> {
+        let (a, b, c) = (self.a, self.b, self.c);
+        let (ac, ab, pa) = (c - a, b - a, a - p);
+        let xs = Vector3::new([ab.x(), ac.x(), pa.x()]);
+        let ys = Vector3::new([ab.y(), ac.y(), pa.y()]);
+
+        let n = xs.cross(ys);
+        if n.z().abs() > 0 {
+            let u = n.x() as f32 / n.z() as f32;
+            let v = n.y() as f32 / n.z() as f32;
+            Vector3::new([1.0 - u - v, u, v])
+        } else {
+            Vector3::new([-1.0, 1.0, 1.0])
+        }
+    }
+
+    /// 对三角形内部进行depth插值计算
+    pub fn get_depth(&self, bc: Vector3<f32>) -> f32 {
+        self.depth.dot(bc)
+    }
+
+    /// 对三角形内部进行uv插值计算
+    /// 给定三角形内的一点，求出插值后的uv坐标
+    pub fn get_uv(&self, bc: Vector3<f32>) -> Vector2<f32> {
+        Matrix::new([self.uv_a, self.uv_b, self.uv_c]).transpose() * bc
+    }
+
+    pub fn get_instensity(&self, bc: Vector3<f32>) -> f32 {
+        self.intensity.dot(bc)
+    }
+
+    pub fn bounding_box(&self, window_width: i32, window_height: i32) -> (i32, i32, i32, i32) {
+        // 确定三角形的最小包围盒
+        let (w, h) = (window_width, window_height);
+
+        let xs = [self.a, self.b, self.c]
+            .into_iter()
+            .map(|x| x.x())
+            .collect::<Vec<_>>();
+        let ys = [self.a, self.b, self.c]
+            .into_iter()
+            .map(|x| x.y())
+            .collect::<Vec<_>>();
+
+        let (x_min, x_max) = (
+            (*xs.iter().min().unwrap()).max(0),
+            (*xs.iter().max().unwrap()).min(w - 1),
+        );
+        let (y_min, y_max) = (
+            (*ys.iter().min().unwrap()).max(0),
+            (*ys.iter().max().unwrap()).min(h - 1),
+        );
+        (x_min, x_max, y_min, y_max)
     }
 }
 
@@ -190,64 +254,37 @@ pub trait DrawTarget {
 
     fn draw_trangle_with_zbuffer(
         &mut self,
-        t: [Vector3<i32>; 3],
+        t: Triangle2D,
         zbuffer: &mut FrameBuffer<f32>,
-        color: [Color; 3],
+        texture_getter: impl Fn(Vector2<f32>) -> Color,
     ) {
-        // 确定三角形的最小包围盒
         let (w, h) = self.get_size();
-        // println!("size: {w} {h}");
-        let xs = t.into_iter().map(|x| x.x()).collect::<Vec<_>>();
-        let ys = t.into_iter().map(|x| x.y()).collect::<Vec<_>>();
-        let (x_min, x_max) = (
-            (*xs.iter().min().unwrap()).max(0),
-            (*xs.iter().max().unwrap()).min(w - 1),
-        );
-        let (y_min, y_max) = (
-            (*ys.iter().min().unwrap()).max(0),
-            (*ys.iter().max().unwrap()).min(h - 1),
-        );
-        // println!("{x_min} {x_max} {y_min} {y_max}");
+        let (x_min, x_max, y_min, y_max) = t.bounding_box(w, h);
         for x in x_min..=x_max {
             for y in y_min..=y_max {
-                let p = Vector3::new([x, y, 0]);
-                let bc = barycentric(t, p);
+                let p = Vector2::new([x, y]);
+                let bc = t.barycentric(p);
+
+                // 剔除三角形之外的点
                 if bc.x() < 0.0 || bc.y() < 0.0 || bc.z() < 0.0 {
                     continue;
                 }
-                let z =
-                    t[0].z() as f32 * bc.x() + t[1].z() as f32 * bc.y() + t[2].z() as f32 * bc.z();
+                let z = t.get_depth(bc);
 
-                // println!("{} {}", *zbuffer.get(x, y), z);
+                let color = texture_getter(t.get_uv(bc));
+
+                let intensity = t.get_instensity(bc);
+                // let color = Color::new(128, 128, 128);
                 if *zbuffer.get(x, y) < z {
                     zbuffer.set(x, y, z);
-
-                    let (mut r, mut g, mut b) = (0.0f32, 0.0f32, 0.0f32);
-                    r += bc.x() * color[0].r as f32
-                        + bc.y() * color[1].r as f32
-                        + bc.z() * color[2].r as f32;
-                    g += bc.x() * color[0].g as f32
-                        + bc.y() * color[1].g as f32
-                        + bc.z() * color[2].g as f32;
-                    b += bc.x() * color[0].b as f32
-                        + bc.y() * color[1].b as f32
-                        + bc.z() * color[2].b as f32;
-
-                    self.draw(
-                        x,
-                        y,
-                        Color {
-                            r: r as u8,
-                            g: g as u8,
-                            b: b as u8,
-                        },
-                    );
+                    self.draw(x, y, color.scale(intensity));
                 }
             }
         }
     }
 }
 
+#[derive(Default)]
 pub struct FrameBuffer<D> {
     width: i32,
     height: i32,

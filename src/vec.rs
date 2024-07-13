@@ -163,12 +163,21 @@ impl<T: Num + Copy> Vector<T, 3> {
         ])
     }
 
+    /// 转换为齐次坐标
     pub fn to_homo_coord(&self) -> Vector<T, 4> {
         Vector4::new([self.x(), self.y(), self.z(), T::one()])
     }
 
+    /// 从齐次坐标构造
     pub fn from_homo_coord(f: Vector<T, 4>) -> Self {
         Self::new([f.x(), f.y(), f.z()]) / f.w()
+    }
+}
+
+impl<T: Num + Copy> Into<Vector2<T>> for Vector3<T> {
+    fn into(self) -> Vector2<T> {
+        let data = self.data;
+        Vector2::new([data[0], data[1]])
     }
 }
 

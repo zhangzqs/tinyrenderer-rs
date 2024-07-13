@@ -86,3 +86,12 @@ pub fn persp(l: f32, r: f32, b: f32, t: f32, f: f32, n: f32) -> Matrix<f32, 4, 4
             Vector4::new([0.0, 0.0, 1.0, 0.0]),
         ])
 }
+
+/// 通过一些角度定义透视投影变换矩阵
+pub fn persp_by_fov(fov_y: f32, aspect_radio: f32, z_near: f32, z_far: f32) -> Matrix<f32, 4, 4> {
+    let t = z_near.abs() * (fov_y / 2.0).tan();
+    let b = -t;
+    let r = t * aspect_radio;
+    let l = -r;
+    persp(l, r, b, t, z_far, z_near)
+}

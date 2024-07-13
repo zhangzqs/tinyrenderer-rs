@@ -19,6 +19,8 @@ pub enum Event {
     Back,
     TurnLeft,
     TurnRight,
+    Up,
+    Down,
 }
 
 impl DisplayWindow {
@@ -58,6 +60,8 @@ impl DisplayWindow {
                         Keycode::S => return Event::Back,
                         Keycode::A => return Event::TurnLeft,
                         Keycode::D => return Event::TurnRight,
+                        Keycode::Q => return Event::Up,
+                        Keycode::Z => return Event::Down,
                         _ => {}
                     }
                 }
