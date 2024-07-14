@@ -1,6 +1,6 @@
 use std::{collections::HashMap, f32::consts::PI, ops::Sub, time::Instant};
 
-use draw_target::{Color, DrawTarget, FrameBuffer, Triangle2D, BLACK, RED, WHITE};
+use draw_target::{Color, DrawTarget, FrameBuffer, Triangle2D};
 
 use mat::Matrix;
 use model::{Model, Texture};
@@ -15,8 +15,6 @@ mod util;
 mod vec;
 
 fn main() {
-    // let mut obj = Model::load_from_obj("assets/african_head.obj");
-    // let diffuse_map = Texture::load_from_tga("assets/african_head_diffuse.tga");
     let obj = Model::load_from_obj("assets/芙宁娜.obj");
 
     let pic_map = HashMap::from([
@@ -60,7 +58,46 @@ fn main() {
         ("裙2+", "体.png"),
         ("髮+", "spa_h.png"),
     ]);
-    let (w, h) = (240, 240);
+
+    // let obj = Model::load_from_obj("assets/可莉.obj");
+    // let pic_map = HashMap::from([
+    //     ("spa_h.png", Texture::load_from("assets/可莉/spa_h.png")),
+    //     ("体.png", Texture::load_from("assets/可莉/体.png")),
+    //     ("颜.png", Texture::load_from("assets/可莉/颜.png")),
+    //     ("髮.png", Texture::load_from("assets/可莉/髮.png")),
+    //     ("肌.png", Texture::load_from("assets/可莉/肌.png")),
+    // ]);
+    // let texture_map = HashMap::from([
+    //     ("颜", "颜.png"),
+    //     ("颜2", "颜.png"),
+    //     ("白目", "颜.png"),
+    //     ("二重", "颜.png"),
+    //     ("目", "体.png"),
+    //     ("睫", "颜.png"),
+    //     ("口舌", "颜.png"),
+    //     ("齿", "颜.png"),
+    //     ("眉", "颜.png"),
+    //     ("星目", "颜.png"),
+    //     ("髮", "髮.png"),
+    //     ("帽", "髮.png"),
+    //     ("饰", "髮.png"),
+    //     ("头饰", "髮.png"),
+    //     ("体", "体.png"),
+    //     ("裙", "体.png"),
+    //     ("裙饰", "髮.png"),
+    //     ("裙饰2", "髮.png"),
+    //     ("裤", "体.png"),
+    //     ("神之眼框", "体.png"),
+    //     ("神之眼AL", "体.png"),
+    //     ("肌", "体.png"),
+    //     ("肌2", "肌.png"),
+    //     ("饰2", "髮.png"),
+    //     ("帽饰alpha", "髮.png"),
+    //     ("裙边alpha", "髮.png"),
+    //     ("髮+", "spa_h.png"),
+    // ]);
+
+    let (w, h) = (1000, 1000);
     let mut window = DisplayWindow::new(w, h);
 
     let mut eye = Vector3::new([0.0, 0.0, 1.0]);
@@ -79,11 +116,16 @@ fn main() {
             last_time = now;
         }
         let r = (angle as f32 / 1000.0) * 2.0 * PI;
-        // let r = 0.0;
         window.fb.clear();
         let light_dir = Vector3::new([0.0, 0.0, -1.0]);
         let mut zbuffer = FrameBuffer::<f32>::new(w, h);
         zbuffer.fill(-f32::MAX);
+        let mvp = // to
+            transform::scale(w as f32, h as f32, 1.0) // Viewport视口变换到屏幕坐标系
+                * transform::scale(0.5, 0.5, 0.5) * transform::translate(Vector3::new([1.0, 1.0, 1.0])) // Scale规范化坐标系
+                * transform::persp_by_fov(PI * 0.5, w as f32 / h as f32, -0.1, 50.0)  // Project投影变换到规范化坐标系
+                * transform::camera(eye, look_at, up) // View相机变换到相机坐标系
+                * transform::translate(Vector3::new([0.0, 0.0, -1.0])) * transform::rotate(Vector3::new([0.0, 1.0, 0.0]), r); // Model模型变换到世界坐标系
         for i in 0..obj.faces_count() {
             // 获取[(坐标序号，UV坐标序号，法向量序号)]
             let (face, mtl) = obj.get_face(i);
@@ -94,64 +136,44 @@ fn main() {
                     // 模型坐标系中得到模型坐标
                     let wc = obj.get_vertex(face[j].0).to_homo_coord();
 
-                    // 模型变换到世界坐标系
-                    let model_matrix = transform::translate(Vector3::new([0.0, 0.0, -3.0]))
-                        * transform::rotate(Vector3::new([0.0, 1.0, 0.0]), r);
-                    let wc = model_matrix * wc;
-                    let norm = transform::rotate(Vector3::new([0.0, 1.0, 0.0]), r)
-                        * obj.get_normal(face[j].2).to_homo_coord();
+                    // 法向量计算
+                    let norm_src = Vector3::from_homo_coord(
+                        transform::rotate(Vector3::new([0.0, 1.0, 0.0]), r)
+                            * obj.get_normal(face[j].2).to_homo_coord(),
+                    );
 
-                    let wc_src = Vector3::from_homo_coord(wc);
-                    let norm_src = Vector3::from_homo_coord(norm);
-
-                    let intensity = 1.0 - norm_src.dot(light_dir);
-                    let intensity = intensity * 0.5;
-                    // println!("intensity: {}", intensity);
-                    // 相机变换到相机坐标系
-                    let wc = transform::camera(eye, look_at, up) * wc;
-
-                    // 投影变换到规范化坐标系
-                    let wc =
-                        transform::persp_by_fov(PI / 4.0, w as f32 / h as f32, -0.1, 50.0) * wc;
+                    // 光照计算
+                    let intensity = (1.0 - norm_src.dot(light_dir)) * 0.5;
 
                     // 齐次坐标系映射到笛卡尔坐标系
-                    let wc = Vector3::from_homo_coord(wc);
+                    let wc = Vector3::from_homo_coord(mvp * wc); // 顶点各种变换
 
-                    // 视口变换到屏幕坐标系
-                    let x0 = ((wc.x() + 1.0) / 2.0 * w as f32) as i32;
-                    let y0 = ((wc.y() + 1.0) / 2.0 * h as f32) as i32;
-
-                    // 世界坐标，屏幕坐标，屏幕深度，uv坐标, 法向量，光照强度
+                    // 屏幕坐标，屏幕深度，uv坐标, 光照强度
                     (
-                        wc_src,
-                        Vector2::new([x0, y0]),
+                        Vector2::new([wc.x() as i32, wc.y() as i32]),
                         wc.z(),
                         obj.get_uv(face[j].1),
-                        norm_src,
                         intensity,
                     )
                 })
                 .collect::<Vec<_>>();
 
-            // 若<0，则为不可见平面，这里进行背面剔除
-            // if intensity > 0.0 {
             window.fb.draw_trangle_with_zbuffer(
                 Triangle2D {
-                    a: t[0].1,
-                    b: t[1].1,
-                    c: t[2].1,
-                    depth: Vector3::new([t[0].2, t[1].2, t[2].2]),
+                    a: t[0].0,
+                    b: t[1].0,
+                    c: t[2].0,
+                    depth: Vector3::new([t[0].1, t[1].1, t[2].1]),
 
-                    uv_a: t[0].3,
-                    uv_b: t[1].3,
-                    uv_c: t[2].3,
+                    uv_a: t[0].2,
+                    uv_b: t[1].2,
+                    uv_c: t[2].2,
 
-                    intensity: Vector3::new([t[0].5, t[1].5, t[2].5]),
+                    intensity: Vector3::new([t[0].3, t[1].3, t[2].3]),
                 },
                 &mut zbuffer,
                 |uv| pic.get_color(uv),
             );
-            // }
         }
         let e = window.update();
         {
@@ -159,16 +181,16 @@ fn main() {
             match e {
                 Nothing => {}
                 Go => {
-                    eye = eye + look_at.normalize() * 0.2;
+                    eye += look_at.normalize() * 0.2;
                 }
                 Back => {
-                    eye = eye - look_at.normalize() * 0.2;
+                    eye -= look_at.normalize() * 0.2;
                 }
                 Up => {
-                    eye = eye + up.normalize() * 0.2;
+                    eye += up.normalize() * 0.2;
                 }
                 Down => {
-                    eye = eye - up.normalize() * 0.2;
+                    eye -= up.normalize() * 0.2;
                 }
                 TurnLeft => {
                     look_at = Vector3::from_homo_coord(
@@ -183,7 +205,7 @@ fn main() {
                     );
                 }
                 Exit => return,
-                
+
                 _ => {}
             }
         }

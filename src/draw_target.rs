@@ -11,10 +11,6 @@ pub struct Color {
 }
 
 impl Color {
-    const fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
-    }
-
     pub fn scale(self, fx: f32) -> Self {
         Self {
             r: (fx * self.r as f32) as u8,
@@ -23,11 +19,6 @@ impl Color {
         }
     }
 }
-
-pub const BLACK: Color = Color::new(0, 0, 0);
-pub const GREEN: Color = Color::new(0, 255, 0);
-pub const WHITE: Color = Color::new(255, 255, 255);
-pub const RED: Color = Color::new(255, 0, 0);
 
 pub struct Triangle2D {
     // 三个顶点坐标

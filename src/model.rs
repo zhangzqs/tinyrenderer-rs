@@ -157,7 +157,7 @@ impl Texture {
     }
 
     pub fn load_from(filename: &str) -> Self {
-        let img = image::io::Reader::open(filename).unwrap().decode().unwrap();
+        let img = image::io::Reader::open(filename).expect(&format!("failed open file {}", filename)).decode().unwrap();
         let (w, h) = (img.width(), img.height());
         let mut fb = Self::new(w as i32, h as i32);
 

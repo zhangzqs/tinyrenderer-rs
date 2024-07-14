@@ -32,6 +32,13 @@ impl<T: Num + Copy, const S: usize> ops::Add for Vector<T, S> {
     }
 }
 
+/// += operator
+impl<T: Num + Copy, const S: usize> ops::AddAssign for Vector<T, S> {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs
+    }
+}
+
 /// - operator
 impl<T: Num + Copy, const S: usize> ops::Sub for Vector<T, S> {
     type Output = Self;
@@ -42,6 +49,13 @@ impl<T: Num + Copy, const S: usize> ops::Sub for Vector<T, S> {
             data[i] = self.data[i] - rhs.data[i];
         }
         Self { data }
+    }
+}
+
+/// -= operator
+impl<T: Num + Copy, const S: usize> ops::SubAssign for Vector<T, S> {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs
     }
 }
 
@@ -131,14 +145,6 @@ impl<T: Num + Copy> Vector<T, 2> {
 
     pub fn y(&self) -> T {
         self.data[1]
-    }
-
-    pub fn to_homo_coord(&self) -> Vector<T, 3> {
-        Vector3::new([self.x(), self.y(), T::one()])
-    }
-
-    pub fn from_homo_coord(f: Vector<T, 3>) -> Self {
-        Self::new([f.x(), f.y()]) / f.z()
     }
 }
 

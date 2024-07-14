@@ -36,7 +36,13 @@ pub fn translate(delta: Vector3<f32>) -> Matrix<f32, 4, 4> {
 }
 
 /// 定义一个缩放矩阵
-pub fn scale(sx: f32, sy: f32, sz: f32) {}
+pub fn scale(sx: f32, sy: f32, sz: f32) -> Matrix<f32, 4, 4> {
+    let mut ret = Matrix::identity();
+    ret.set(0, 0, sx);
+    ret.set(1, 1, sy);
+    ret.set(2, 2, sz);
+    ret
+}
 
 /// 定义一个相机变换矩阵
 pub fn camera(
